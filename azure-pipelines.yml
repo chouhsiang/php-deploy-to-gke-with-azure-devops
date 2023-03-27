@@ -5,9 +5,9 @@ resources:
 - repo: self
 
 variables:
-  image: 'asia-east1-docker.pkg.dev/it-production-377006/nginx/php'
+  image: 'asia-east1-docker.pkg.dev/it-production-377006/nginx/slim'
   tag: '$(Build.BuildNumber)'
-
+  domain: 'slim.twcanhelp.me'
 stages:
 - stage: Build
   displayName: Build image
@@ -19,9 +19,19 @@ stages:
     steps:
     - task: DownloadSecureFile@1
       name: GCPsecret
-      displayName: 'Download CA certificate'
+      displayName: 'Download GCP secret'
       inputs:
-        secureFile: 'a.json'
+        secureFile: 'gcp.json'
+    - task: DownloadSecureFile@1
+      name: SSLcert
+      displayName: 'Download ssl cert'
+      inputs:
+        secureFile: 'cert.pem'
+    - task: DownloadSecureFile@1
+      name: SSLkey
+      displayName: 'Download ssl key'
+      inputs:
+        secureFile: 'cert.key'
     - script: |
         gcloud auth login --cred-file $(GCPsecret.secureFilePath)
         gcloud auth configure-docker --quiet asia-east1-docker.pkg.dev
@@ -34,3 +44,17 @@ stages:
         repository: $(image)
         tags: |
           $(tag)
+    - script: | 
+        echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+        curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
+        sudo apt-get update && sudo apt-get install -y google-cloud-sdk-gke-gcloud-auth-plugin
+        gcloud container clusters get-credentials autopilot-cluster-1 --region asia-east1 --project it-production-377006
+      displayName: Install dependency packages  # https://cloud.google.com/blog/products/containers-kubernetes/kubectl-auth-changes-in-gke
+    - script: |  
+        export image=$(image)
+        export tag=$(tag)
+        export domain=$(domain)
+        kubectl create secret tls cert-slim --cert=$(SSLcert.secureFilePath) --key=$(SSLkey.secureFilePath) \
+          --dry-run -o yaml | kubectl apply -f 
+        envsubst < kubernetes.yml | kubectl apply -f -
+      displayName: Deploy to K8s
