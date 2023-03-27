@@ -55,6 +55,6 @@ stages:
         export tag=$(tag)
         export domain=$(domain)
         kubectl create secret tls cert-slim --cert=$(SSLcert.secureFilePath) --key=$(SSLkey.secureFilePath) \
-          --dry-run -o yaml | kubectl apply -f -
+          --dry-run=client -o yaml | kubectl apply -f -
         envsubst < kubernetes.yml | kubectl apply -f -
       displayName: Deploy to K8s
