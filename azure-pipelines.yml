@@ -1,0 +1,36 @@
+trigger:
+- main
+
+resources:
+- repo: self
+
+variables:
+  image: 'asia-east1-docker.pkg.dev/it-production-377006/nginx/php'
+  tag: '$(Build.BuildNumber)'
+
+stages:
+- stage: Build
+  displayName: Build image
+  jobs:
+  - job: Build
+    displayName: Build
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+    - task: DownloadSecureFile@1
+      name: GCPsecret
+      displayName: 'Download CA certificate'
+      inputs:
+        secureFile: 'a.json'
+    - script: |
+        gcloud auth login --cred-file $(GCPsecret.secureFilePath)
+        gcloud auth configure-docker --quiet asia-east1-docker.pkg.dev
+      displayName: Gcloud login & Get docker token
+    - task: Docker@2
+      displayName: Build & Push image
+      inputs:
+        command: buildAndPush
+        dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
+        repository: $(image)
+        tags: |
+          $(tag)
