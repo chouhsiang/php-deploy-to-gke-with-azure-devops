@@ -30,7 +30,7 @@ stages:
       displayName: Build & Push image
       inputs:
         command: buildAndPush
-        dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
+        dockerfile: '$(Build.SourcesDirectory)/slim/Dockerfile'
         repository: $(image)
         tags: |
           $(tag)
